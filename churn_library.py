@@ -24,10 +24,15 @@ import logging
 
 from constants import IMAGES_DIR, CAT_COLUMNS, KEEP_COLUMNS
 
-logging.basicConfig(filename='logs/churn_library.log', 
-    filemode='w', 
-    format='%(asctime)s - %(levelname)s: %(message)s',
-    level=logging.INFO)
+import logging
+import logging.config
+import yaml
+
+with open('log_config.yaml', 'r') as config_file:
+	config = yaml.safe_load(config_file)
+	logging.config.dictConfig(config)
+
+logger = logging.getLogger('mainLogger')
 
 def import_data(pth, **kwargs):
     '''
@@ -38,12 +43,12 @@ def import_data(pth, **kwargs):
             df: pandas dataframe
     '''
     try:
-        logging.info(f'Loading data from {pth}...')
+        logger.info(f'Loading data from {pth}...')
         df = pd.read_csv(pth, **kwargs)
         return df
     except FileNotFoundError as e:
-        logging.exception('churn_library')
-        logging.error(f'No file found at {pth}. Exiting...')
+        logger.exception('churn_library')
+        logger.error(f'No file found at {pth}. Exiting...')
         raise e
 
 def generate_histograms(df, category_lst, xlabels, target_dir):
@@ -60,15 +65,15 @@ def generate_histograms(df, category_lst, xlabels, target_dir):
     for cat, xlabel in zip(category_lst, xlabels):
         filename = f'{cat.lower()}_histogram.jpg'
         try:
-            logging.info(f'Attempting to generate histogram for {cat}.')
+            logger.info(f'Attempting to generate histogram for {cat}.')
             plt.figure(figsize=(20,10))
             df[cat].hist()
             plt.ylabel('Number of Customers')
             plt.xlabel(xlabel)
             plt.savefig(f'{target_dir}/{filename}')
-            logging.info(f'Saved histogram: {filename}.')
+            logger.info(f'Saved histogram: {filename}.')
         except KeyError:
-            logging.error(f'{cat} category not found in DataFrame.')
+            logger.error(f'{cat} category not found in DataFrame.')
     return None
 
 def perform_eda(df, histogram_category_lst, target_dir):
@@ -81,26 +86,34 @@ def perform_eda(df, histogram_category_lst, target_dir):
         output:
             None
     '''
-    logging.info('Performing exploratory data analysis...')
+    logger.info('Performing exploratory data analysis...')
     generate_histograms(df, histogram_category_lst, histogram_category_lst, target_dir)
 
-    ms_filename = 'marital_status_bar_chart.jpg'
-    plt.figure(figsize=(20,10)) 
-    df.Marital_Status.value_counts('normalize').plot(kind='bar')
-    plt.savefig(f'{target_dir}/{ms_filename}')
-    logging.info(f'Saved {ms_filename}')
+    bar_chart_col = 'Marital_Status'
+    try:
+        ms_filename = f'{bar_chart_col.lower()}_bar_chart.jpg'
+        plt.figure(figsize=(20,10)) 
+        df[bar_chart_col].value_counts('normalize').plot(kind='bar')
+        plt.savefig(f'{target_dir}/{ms_filename}')
+        logger.info(f'Saved {ms_filename}')
+    except KeyError:
+        logger.error(f'Column `{bar_chart_col}` not found in DataFrame')
 
-    tt_filename = 'total_trans_ct.jpg'
-    plt.figure(figsize=(20,10)) 
-    sns.distplot(df['Total_Trans_Ct'])
-    plt.savefig(f'{target_dir}/{tt_filename}')
-    logging.info(f'Saved {tt_filename}')
+    dist_col = 'Total_Trans_Ct'
+    try:
+        tt_filename = f'{dist_col.lower()}.jpg'
+        plt.figure(figsize=(20,10))
+        sns.distplot(df[dist_col])
+        plt.savefig(f'{target_dir}/{tt_filename}')
+        logger.info(f'Saved {tt_filename}')
+    except KeyError:
+        logger.error(f'Column `{dist_col}` not found in DataFrame')
 
     hm_filename = 'heat_map.jpg'
     plt.figure(figsize=(20,10)) 
     sns.heatmap(df.corr(), annot=False, cmap='Dark2_r', linewidths = 2)
     plt.savefig(f'{target_dir}/{hm_filename}', bbox_inches='tight')
-    logging.info(f'Saved {hm_filename}')
+    logger.info(f'Saved {hm_filename}')
 
 def encoder_helper(df, category_lst, response='Churn'):
     '''
@@ -117,11 +130,11 @@ def encoder_helper(df, category_lst, response='Churn'):
     df[response] = df['Attrition_Flag'].apply(lambda val: 0 if val == "Existing Customer" else 1)
     for cat in category_lst:
         try:
-            logging.info(f'Encoding categorical variable: {cat}')
+            logger.info(f'Encoding categorical variable: {cat}')
             cat_groups = df.groupby(cat).mean()[response]
             df[cat + f'_{response}'] = df[cat].apply(lambda val: cat_groups.loc[val])
         except KeyError:
-            logging.error(f'{cat} category not found in DataFrame.')
+            logger.error(f'{cat} category not found in DataFrame.')
     return df
 
 
@@ -138,8 +151,8 @@ def perform_feature_engineering(df, target_feature, test_size=0.3):
             y_train: y training data
             y_test: y testing data
     '''
-    logging.info(f'Performing feature engineering. Keeping columns: {", ".join(KEEP_COLUMNS)}.')
-    logging.info(f'Target feature is: `{target_feature}`')
+    logger.info(f'Performing feature engineering. Keeping columns: {", ".join(KEEP_COLUMNS)}.')
+    logger.info(f'Target feature is: `{target_feature}`')
     X = pd.DataFrame()
     y = df[target_feature]
     X[KEEP_COLUMNS] = df[KEEP_COLUMNS]
@@ -176,7 +189,7 @@ def classification_report_image(y_train,
     plt.text(0.01, 0.05, str(classification_report(y_test, y_test_preds_rf)), {'fontsize': 10}, fontproperties = 'monospace')
     plt.axis('off')
     plt.savefig(f'{target_dir}/{rfc_filename}', bbox_inches='tight')
-    logging.info(f'Saved Random Forest classification report: {rfc_filename}')
+    logger.info(f'Saved Random Forest classification report: {rfc_filename}')
 
     # plots Logistic Regression model classification Report
     lr_filename = 'logistic_regression_cr.jpg'
@@ -187,7 +200,7 @@ def classification_report_image(y_train,
     plt.text(0.01, 0.7, str(classification_report(y_test, y_test_preds_lr)), {'fontsize': 10}, fontproperties = 'monospace')
     plt.axis('off')
     plt.savefig(f'{target_dir}/{lr_filename}', bbox_inches='tight')
-    logging.info(f'Saved Logistic Regression classification report: {lr_filename}')
+    logger.info(f'Saved Logistic Regression classification report: {lr_filename}')
 
 def roc_plot(lr_model, rfc_model, X_test, y_test, target_dir):
     """
@@ -208,7 +221,7 @@ def roc_plot(lr_model, rfc_model, X_test, y_test, target_dir):
     _ = plot_roc_curve(rfc_model, X_test, y_test, ax=ax, alpha=0.8)
     lrc_plot.plot(ax=ax, alpha=0.8)
     plt.savefig(f'{target_dir}/{roc_filename}')
-    logging.info(f'Saved ROC plot: {roc_filename}')
+    logger.info(f'Saved ROC plot: {roc_filename}')
 
 def feature_importance_plot(model, X_data, target_dir):
     '''
@@ -243,7 +256,7 @@ def feature_importance_plot(model, X_data, target_dir):
 
     filename = 'random_forest_feature_importance.jpg'
     plt.savefig(f'{target_dir}/{filename}', bbox_inches='tight')
-    logging.info(f'Saved feature importance plot: {filename}')
+    logger.info(f'Saved feature importance plot: {filename}')
 
 def train_random_forest_classifier(X_train, y_train, param_grid=None):
     """ 
@@ -255,7 +268,7 @@ def train_random_forest_classifier(X_train, y_train, param_grid=None):
         output:
             trained model: sklearn.linear_model.LogisticRegression
     """
-    logging.info('Initialising Random Forest classifier...')
+    logger.info('Initialising Random Forest classifier...')
     rfc = RandomForestClassifier(random_state=42)
     if param_grid is None:
         param_grid = { 
@@ -266,7 +279,7 @@ def train_random_forest_classifier(X_train, y_train, param_grid=None):
         }
 
     cv_rfc = GridSearchCV(estimator=rfc, param_grid=param_grid, cv=5)
-    logging.info('Training RFC. Please wait...')
+    logger.info('Training RFC. Please wait...')
     cv_rfc.fit(X_train, y_train)
     return cv_rfc
 
@@ -280,9 +293,9 @@ def train_logistic_regression(X_train, y_train, solver='liblinear'):
         output:
             trained model: sklearn.linear_model.LogisticRegression
     """
-    logging.info(f'Initialising Logistic Regression with {solver}.')
+    logger.info(f'Initialising Logistic Regression with {solver}.')
     lrc = LogisticRegression(solver=solver)
-    logging.info('Training LR. Please wait...')
+    logger.info('Training LR. Please wait...')
     lrc.fit(X_train, y_train)
     return lrc
 
@@ -304,10 +317,10 @@ def train_models(X_train, X_test, y_train, y_test):
     try:
         joblib.dump(cv_rfc.best_estimator_, './models/rfc_model.pkl')
         joblib.dump(lrc, './models/logistic_model.pkl')
-        logging.info('Models saved successfully.')
+        logger.info('Models saved successfully.')
     except Exception as e:
-        logging.error('Error saving models. Exiting.')
-        logging.exception('churn_library')
+        logger.error('Error saving models. Exiting.')
+        logger.exception('churn_library')
         raise e
     return
 
