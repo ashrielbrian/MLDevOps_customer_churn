@@ -5,34 +5,31 @@
     Author: Brian Tang
     Date: July 2021
 """
+import logging
+import logging.config
+import yaml
+from sklearn.metrics import plot_roc_curve, classification_report
+from sklearn.model_selection import GridSearchCV
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import normalize
 import shap
 import joblib
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns; sns.set()
-
-from sklearn.preprocessing import normalize
-from sklearn.model_selection import train_test_split
-
-from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import GridSearchCV
-
-from sklearn.metrics import plot_roc_curve, classification_report
-import logging
-
+import seaborn as sns
 from constants import IMAGES_DIR, CAT_COLUMNS, KEEP_COLUMNS
+sns.set()
 
-import logging
-import logging.config
-import yaml
 
 with open('log_config.yaml', 'r') as config_file:
-	config = yaml.safe_load(config_file)
-	logging.config.dictConfig(config)
+    config = yaml.safe_load(config_file)
+    logging.config.dictConfig(config)
 
 logger = logging.getLogger('mainLogger')
+
 
 def import_data(pth, **kwargs):
     '''
@@ -51,6 +48,7 @@ def import_data(pth, **kwargs):
         logger.error(f'No file found at {pth}. Exiting...')
         raise e
 
+
 def generate_histograms(df, category_lst, xlabels, target_dir):
     '''
         Saves histograms of dataframe categories
@@ -66,7 +64,7 @@ def generate_histograms(df, category_lst, xlabels, target_dir):
         filename = f'{cat.lower()}_histogram.jpg'
         try:
             logger.info(f'Attempting to generate histogram for {cat}.')
-            plt.figure(figsize=(20,10))
+            plt.figure(figsize=(20, 10))
             df[cat].hist()
             plt.ylabel('Number of Customers')
             plt.xlabel(xlabel)
@@ -75,6 +73,7 @@ def generate_histograms(df, category_lst, xlabels, target_dir):
         except KeyError:
             logger.error(f'{cat} category not found in DataFrame.')
     return None
+
 
 def perform_eda(df, histogram_category_lst, target_dir):
     '''
@@ -87,12 +86,16 @@ def perform_eda(df, histogram_category_lst, target_dir):
             None
     '''
     logger.info('Performing exploratory data analysis...')
-    generate_histograms(df, histogram_category_lst, histogram_category_lst, target_dir)
+    generate_histograms(
+        df,
+        histogram_category_lst,
+        histogram_category_lst,
+        target_dir)
 
     bar_chart_col = 'Marital_Status'
     try:
         ms_filename = f'{bar_chart_col.lower()}_bar_chart.jpg'
-        plt.figure(figsize=(20,10)) 
+        plt.figure(figsize=(20, 10))
         df[bar_chart_col].value_counts('normalize').plot(kind='bar')
         plt.savefig(f'{target_dir}/{ms_filename}')
         logger.info(f'Saved {ms_filename}')
@@ -102,7 +105,7 @@ def perform_eda(df, histogram_category_lst, target_dir):
     dist_col = 'Total_Trans_Ct'
     try:
         tt_filename = f'{dist_col.lower()}.jpg'
-        plt.figure(figsize=(20,10))
+        plt.figure(figsize=(20, 10))
         sns.distplot(df[dist_col])
         plt.savefig(f'{target_dir}/{tt_filename}')
         logger.info(f'Saved {tt_filename}')
@@ -110,10 +113,11 @@ def perform_eda(df, histogram_category_lst, target_dir):
         logger.error(f'Column `{dist_col}` not found in DataFrame')
 
     hm_filename = 'heat_map.jpg'
-    plt.figure(figsize=(20,10)) 
-    sns.heatmap(df.corr(), annot=False, cmap='Dark2_r', linewidths = 2)
+    plt.figure(figsize=(20, 10))
+    sns.heatmap(df.corr(), annot=False, cmap='Dark2_r', linewidths=2)
     plt.savefig(f'{target_dir}/{hm_filename}', bbox_inches='tight')
     logger.info(f'Saved {hm_filename}')
+
 
 def encoder_helper(df, category_lst, response='Churn'):
     '''
@@ -127,12 +131,14 @@ def encoder_helper(df, category_lst, response='Churn'):
                 df: pandas dataframe with new columns for
     '''
 
-    df[response] = df['Attrition_Flag'].apply(lambda val: 0 if val == "Existing Customer" else 1)
+    df[response] = df['Attrition_Flag'].apply(
+        lambda val: 0 if val == "Existing Customer" else 1)
     for cat in category_lst:
         try:
             logger.info(f'Encoding categorical variable: {cat}')
             cat_groups = df.groupby(cat).mean()[response]
-            df[cat + f'_{response}'] = df[cat].apply(lambda val: cat_groups.loc[val])
+            df[cat +
+               f'_{response}'] = df[cat].apply(lambda val: cat_groups.loc[val])
         except KeyError:
             logger.error(f'{cat} category not found in DataFrame.')
     return df
@@ -151,13 +157,16 @@ def perform_feature_engineering(df, target_feature, test_size=0.3):
             y_train: y training data
             y_test: y testing data
     '''
-    logger.info(f'Performing feature engineering. Keeping columns: {", ".join(KEEP_COLUMNS)}.')
+    logger.info(
+        f'Performing feature engineering. Keeping columns: {", ".join(KEEP_COLUMNS)}.')
     logger.info(f'Target feature is: `{target_feature}`')
     X = pd.DataFrame()
     y = df[target_feature]
     X[KEEP_COLUMNS] = df[KEEP_COLUMNS]
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=test_size, random_state=42)
     return X_train, X_test, y_train, y_test
+
 
 def classification_report_image(y_train,
                                 y_test,
@@ -183,10 +192,20 @@ def classification_report_image(y_train,
     # plots Random Forest model classification report
     rfc_filename = 'random_forest_cr.jpg'
     plt.figure(figsize=(5, 5))
-    plt.text(0.01, 1.25, str('Random Forest Train'), {'fontsize': 10}, fontproperties = 'monospace')
-    plt.text(0.01, 0.7, str(classification_report(y_train, y_train_preds_rf)), {'fontsize': 10}, fontproperties = 'monospace')
-    plt.text(0.01, 0.6, str('Random Forest Test'), {'fontsize': 10}, fontproperties = 'monospace')
-    plt.text(0.01, 0.05, str(classification_report(y_test, y_test_preds_rf)), {'fontsize': 10}, fontproperties = 'monospace')
+    plt.text(0.01, 1.25, str('Random Forest Train'), {
+             'fontsize': 10}, fontproperties='monospace')
+    plt.text(
+        0.01, 0.7, str(
+            classification_report(
+                y_train, y_train_preds_rf)), {
+            'fontsize': 10}, fontproperties='monospace')
+    plt.text(0.01, 0.6, str('Random Forest Test'), {
+             'fontsize': 10}, fontproperties='monospace')
+    plt.text(
+        0.01, 0.05, str(
+            classification_report(
+                y_test, y_test_preds_rf)), {
+            'fontsize': 10}, fontproperties='monospace')
     plt.axis('off')
     plt.savefig(f'{target_dir}/{rfc_filename}', bbox_inches='tight')
     logger.info(f'Saved Random Forest classification report: {rfc_filename}')
@@ -194,13 +213,25 @@ def classification_report_image(y_train,
     # plots Logistic Regression model classification Report
     lr_filename = 'logistic_regression_cr.jpg'
     plt.figure(figsize=(5, 5))
-    plt.text(0.01, 1.25, str('Logistic Regression Train'), {'fontsize': 10}, fontproperties = 'monospace')
-    plt.text(0.01, 0.05, str(classification_report(y_train, y_train_preds_lr)), {'fontsize': 10}, fontproperties = 'monospace')
-    plt.text(0.01, 0.6, str('Logistic Regression Test'), {'fontsize': 10}, fontproperties = 'monospace')
-    plt.text(0.01, 0.7, str(classification_report(y_test, y_test_preds_lr)), {'fontsize': 10}, fontproperties = 'monospace')
+    plt.text(0.01, 1.25, str('Logistic Regression Train'),
+             {'fontsize': 10}, fontproperties='monospace')
+    plt.text(
+        0.01, 0.05, str(
+            classification_report(
+                y_train, y_train_preds_lr)), {
+            'fontsize': 10}, fontproperties='monospace')
+    plt.text(0.01, 0.6, str('Logistic Regression Test'), {
+             'fontsize': 10}, fontproperties='monospace')
+    plt.text(
+        0.01, 0.7, str(
+            classification_report(
+                y_test, y_test_preds_lr)), {
+            'fontsize': 10}, fontproperties='monospace')
     plt.axis('off')
     plt.savefig(f'{target_dir}/{lr_filename}', bbox_inches='tight')
-    logger.info(f'Saved Logistic Regression classification report: {lr_filename}')
+    logger.info(
+        f'Saved Logistic Regression classification report: {lr_filename}')
+
 
 def roc_plot(lr_model, rfc_model, X_test, y_test, target_dir):
     """
@@ -216,12 +247,13 @@ def roc_plot(lr_model, rfc_model, X_test, y_test, target_dir):
     """
     roc_filename = 'roc_plot.jpg'
     lrc_plot = plot_roc_curve(lr_model, X_test, y_test)
-    plt.figure(figsize=(15,8))
+    plt.figure(figsize=(15, 8))
     ax = plt.gca()
     _ = plot_roc_curve(rfc_model, X_test, y_test, ax=ax, alpha=0.8)
     lrc_plot.plot(ax=ax, alpha=0.8)
     plt.savefig(f'{target_dir}/{roc_filename}')
     logger.info(f'Saved ROC plot: {roc_filename}')
+
 
 def feature_importance_plot(model, X_data, target_dir):
     '''
@@ -242,7 +274,7 @@ def feature_importance_plot(model, X_data, target_dir):
     names = [X_data.columns[i] for i in indices]
 
     # Create plot
-    plt.figure(figsize=(20,5))
+    plt.figure(figsize=(20, 5))
 
     # Create plot title
     plt.title("Feature Importance")
@@ -258,8 +290,9 @@ def feature_importance_plot(model, X_data, target_dir):
     plt.savefig(f'{target_dir}/{filename}', bbox_inches='tight')
     logger.info(f'Saved feature importance plot: {filename}')
 
+
 def train_random_forest_classifier(X_train, y_train, param_grid=None):
-    """ 
+    """
         Initializes and trains a random forest classifier
         input:
             X_train: X training data
@@ -271,11 +304,11 @@ def train_random_forest_classifier(X_train, y_train, param_grid=None):
     logger.info('Initialising Random Forest classifier...')
     rfc = RandomForestClassifier(random_state=42)
     if param_grid is None:
-        param_grid = { 
+        param_grid = {
             'n_estimators': [200, 500],
             'max_features': ['auto', 'sqrt'],
-            'max_depth' : [4,5,100],
-            'criterion' :['gini', 'entropy']
+            'max_depth': [4, 5, 100],
+            'criterion': ['gini', 'entropy']
         }
 
     cv_rfc = GridSearchCV(estimator=rfc, param_grid=param_grid, cv=5)
@@ -283,8 +316,9 @@ def train_random_forest_classifier(X_train, y_train, param_grid=None):
     cv_rfc.fit(X_train, y_train)
     return cv_rfc
 
+
 def train_logistic_regression(X_train, y_train, solver='liblinear'):
-    """ 
+    """
         initializes and trains a logistic regression model
         input:
             X_train: X training data
@@ -298,6 +332,7 @@ def train_logistic_regression(X_train, y_train, solver='liblinear'):
     logger.info('Training LR. Please wait...')
     lrc.fit(X_train, y_train)
     return lrc
+
 
 def train_models(X_train, X_test, y_train, y_test):
     '''
@@ -324,6 +359,7 @@ def train_models(X_train, X_test, y_train, y_test):
         raise e
     return
 
+
 def load_model(model_pth):
     '''
         Loads the model given its path
@@ -334,25 +370,27 @@ def load_model(model_pth):
     '''
     return joblib.load(model_pth)
 
+
 if __name__ == '__main__':
     # define directory paths
     EDA_DIR = IMAGES_DIR + '/eda'
-    RESULTS_DIR  = IMAGES_DIR + '/results'
+    RESULTS_DIR = IMAGES_DIR + '/results'
 
     # preprocess data
     df = import_data('data/bank_data.csv')
     df = encoder_helper(df, CAT_COLUMNS)
     perform_eda(df, ['Churn', 'Customer_Age'], EDA_DIR)
 
-    X_train, X_test, y_train, y_test = perform_feature_engineering(df, target_feature='Churn')
-    
+    X_train, X_test, y_train, y_test = perform_feature_engineering(
+        df, target_feature='Churn')
+
     # model training
     train_models(X_train, X_test, y_train, y_test)
-    
+
     # reload models for prediction and reporting
     rfc_model = load_model('./models/rfc_model.pkl')
     lr_model = load_model('./models/logistic_model.pkl')
-    
+
     # run predictions
     y_train_preds_lr = lr_model.predict(X_train)
     y_test_preds_lr = lr_model.predict(X_test)
@@ -364,6 +402,6 @@ if __name__ == '__main__':
     classification_report_image(y_train, y_test, y_train_preds_lr,
                                 y_train_preds_rf, y_test_preds_lr,
                                 y_test_preds_rf, target_dir=RESULTS_DIR)
-    
+
     feature_importance_plot(rfc_model, X_train, target_dir=RESULTS_DIR)
     roc_plot(lr_model, rfc_model, X_test, y_test, target_dir=RESULTS_DIR)

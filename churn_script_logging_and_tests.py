@@ -201,18 +201,11 @@ def test_roc_plot(roc_plot, fixture):
 if __name__ == "__main__":
 	fixture = setup_test()
 
-	# test_import(lb.import_data)
-	# test_encoder_helper(lb.encoder_helper)
-	# test_eda(lb.perform_eda, fixture)
-	# test_perform_feature_engineering(lb.perform_feature_engineering, fixture)
-	# test_train_models(lb.train_models, fixture)
-	# test_classification_report(lb.classification_report_image, fixture)
-	# test_feature_importance_plot(lb.feature_importance_plot, fixture)
+	test_import(lb.import_data)
+	test_encoder_helper(lb.encoder_helper)
+	test_eda(lb.perform_eda, fixture)
+	test_perform_feature_engineering(lb.perform_feature_engineering, fixture)
+	test_train_models(lb.train_models, fixture)
+	test_classification_report(lb.classification_report_image, fixture)
+	test_feature_importance_plot(lb.feature_importance_plot, fixture)
 	test_roc_plot(lb.roc_plot, fixture)
-
-
-
-
-
-
-
