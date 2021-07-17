@@ -20,9 +20,13 @@ logger = logging.getLogger('testLogger')
 
 
 def test_import(import_data):
-    '''
-    test data import - this example is completed for you to assist with the other test functions
-    '''
+    """
+        Tests import_data
+        input:
+            import_data: function to be tested
+        output:
+            None
+    """
     try:
         df = import_data("./data/bank_data.csv")
         logger.info("Testing import_data: SUCCESS")
@@ -40,9 +44,14 @@ def test_import(import_data):
 
 
 def test_eda(perform_eda, fixture):
-    '''
-    test perform eda function
-    '''
+	"""
+        Tests perform_eda
+        input:
+            perform_eda: function to be tested
+			fixture: dictionary containing test components
+        output:
+            None
+    """
 
     df = fixture['encoded_dataframe']
     perform_eda(df, ['Churn', 'Customer_Age'], 'images/eda')
@@ -62,9 +71,13 @@ def test_eda(perform_eda, fixture):
 
 
 def test_encoder_helper(encoder_helper):
-    '''
-    test encoder helper
-    '''
+    """
+        Tests encoder_helper
+        input:
+            encoder_helper: function to be tested
+        output:
+            None
+    """
     y_target = 'Churn'
 
     df = pd.read_csv('data/bank_data.csv')
@@ -90,9 +103,14 @@ def test_encoder_helper(encoder_helper):
 
 
 def test_perform_feature_engineering(perform_feature_engineering, fixture):
-    '''
-    test perform_feature_engineering
-    '''
+    """
+        Tests perform_feature_engineering
+        input:
+            perform_feature_engineering: function to be tested
+			fixture: dictionary containing test components
+        output:
+            None
+    """
     x_train, x_test, y_train, y_test = perform_feature_engineering(
         fixture['encoded_dataframe'], fixture['y_target'])
 
@@ -109,9 +127,14 @@ def test_perform_feature_engineering(perform_feature_engineering, fixture):
 
 
 def test_train_models(train_models, fixture):
-    '''
-    test train_models
-    '''
+    """
+        Tests train_models
+        input:
+            train_models: function to be tested
+			fixture: dictionary containing test components
+        output:
+            None
+    """
     x_train, x_test, y_train, y_test = fixture['data']
     train_models(x_train, y_train)
 
@@ -127,7 +150,11 @@ def test_train_models(train_models, fixture):
 
 def setup_test():
     '''
-    sets up test fixture
+    	Sets up the test fixtures
+		input:
+			None
+		output:
+			fixture: dictionary containing test components
     '''
     logger.info('Setting up the test...')
 
@@ -165,9 +192,14 @@ def setup_test():
 
 
 def test_classification_report(classification_report_image, fixture):
-    '''
-    test classification_report_image
-    '''
+    """
+        Tests classification_report_image
+        input:
+            classification_report_image: function to be tested
+			fixture: dictionary containing test components
+        output:
+            None
+    """
     y_train, y_test = fixture['data'][2], fixture['data'][3]
     y_train_preds_lr, y_test_preds_lr, y_train_preds_rf, y_test_preds_rf = fixture['preds']
 
@@ -188,7 +220,12 @@ def test_classification_report(classification_report_image, fixture):
 
 def test_feature_importance_plot(feature_importance_plot, fixture):
     """
-    test feature_importance_plot
+        Tests feature_importance_plot
+        input:
+            feature_importance_plot: function to be tested
+			fixture: dictionary containing test components
+        output:
+            None
     """
     rfc_model = fixture['models'][1]
     x_test = fixture['data'][1]
@@ -206,7 +243,12 @@ def test_feature_importance_plot(feature_importance_plot, fixture):
 
 def test_roc_plot(roc_plot, fixture):
     """
-    test roc_plot
+        Tests roc_plot
+        input:
+            roc_plot: function to be tested
+			fixture: dictionary containing test components
+        output:
+            None
     """
     lr_model, rfc_model = fixture['models'][0], fixture['models'][1]
     x_test, y_test = fixture['data'][1], fixture['data'][3]
