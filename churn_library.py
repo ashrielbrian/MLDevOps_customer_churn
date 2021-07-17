@@ -13,8 +13,6 @@ from sklearn.model_selection import GridSearchCV
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import normalize
-import shap
 import joblib
 import pandas as pd
 import numpy as np
@@ -43,10 +41,10 @@ def import_data(pth, **kwargs):
         logger.info(f'Loading data from {pth}...')
         df = pd.read_csv(pth, **kwargs)
         return df
-    except FileNotFoundError as e:
+    except FileNotFoundError as err:
         logger.exception('churn_library')
         logger.error(f'No file found at {pth}. Exiting...')
-        raise e
+        raise err
 
 
 def generate_histograms(df, category_lst, xlabels, target_dir):
@@ -72,7 +70,6 @@ def generate_histograms(df, category_lst, xlabels, target_dir):
             logger.info(f'Saved histogram: {filename}.')
         except KeyError:
             logger.error(f'{cat} category not found in DataFrame.')
-    return None
 
 
 def perform_eda(df, histogram_category_lst, target_dir):
@@ -126,7 +123,7 @@ def encoder_helper(df, category_lst, response='Churn'):
         input:
                 df: pandas dataframe
                 category_lst: list of columns that contain categorical features
-                response: string of response name [optional argument that could be used for naming variables or index y column]
+                response: [optional] string of response used for naming target y column
         output:
                 df: pandas dataframe with new columns for
     '''
@@ -149,23 +146,22 @@ def perform_feature_engineering(df, target_feature, test_size=0.3):
         Runs feature engineering to keep columns and returns train/test data
         input:
             df: pandas dataframe
-            response: string of response name [optional argument that could be used for naming variables or index y column]
-
+            response: [optional] string of response used for naming target y column
         output:
-            X_train: X training data
-            X_test: X testing data
+            x_train: X training data
+            x_test: X testing data
             y_train: y training data
             y_test: y testing data
     '''
     logger.info(
         f'Performing feature engineering. Keeping columns: {", ".join(KEEP_COLUMNS)}.')
     logger.info(f'Target feature is: `{target_feature}`')
-    X = pd.DataFrame()
-    y = df[target_feature]
-    X[KEEP_COLUMNS] = df[KEEP_COLUMNS]
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=test_size, random_state=42)
-    return X_train, X_test, y_train, y_test
+    target_df = pd.DataFrame()
+    target_label = df[target_feature]
+    target_df[KEEP_COLUMNS] = df[KEEP_COLUMNS]
+    x_train, x_test, y_train, y_test = train_test_split(
+        target_df, target_label, test_size=test_size, random_state=42)
+    return x_train, x_test, y_train, y_test
 
 
 def classification_report_image(y_train,
@@ -233,34 +229,34 @@ def classification_report_image(y_train,
         f'Saved Logistic Regression classification report: {lr_filename}')
 
 
-def roc_plot(lr_model, rfc_model, X_test, y_test, target_dir):
+def roc_plot(lr_model, rfc_model, x_test, y_test, target_dir):
     """
         Saves the ROC results for the LR and RFC models on the same plot
         input:
             lr_model: training response values
             rfc_model:  test response values
-            X_test: training predictions from logistic regression
+            x_test: training predictions from logistic regression
             y_test: training predictions from random forest
             target_dir: directory to save image results t
         output:
             None
     """
     roc_filename = 'roc_plot.jpg'
-    lrc_plot = plot_roc_curve(lr_model, X_test, y_test)
+    lrc_plot = plot_roc_curve(lr_model, x_test, y_test)
     plt.figure(figsize=(15, 8))
-    ax = plt.gca()
-    _ = plot_roc_curve(rfc_model, X_test, y_test, ax=ax, alpha=0.8)
-    lrc_plot.plot(ax=ax, alpha=0.8)
+    axis = plt.gca()
+    _ = plot_roc_curve(rfc_model, x_test, y_test, ax=axis, alpha=0.8)
+    lrc_plot.plot(ax=axis, alpha=0.8)
     plt.savefig(f'{target_dir}/{roc_filename}')
     logger.info(f'Saved ROC plot: {roc_filename}')
 
 
-def feature_importance_plot(model, X_data, target_dir):
+def feature_importance_plot(model, x_data, target_dir):
     '''
         Creates and stores the feature importances in pth
         input:
             model: model object containing feature_importances_
-            X_data: pandas dataframe of X values
+            x_data: pandas dataframe of X values
             output_pth: path to store the figure
         output:
             None
@@ -271,7 +267,7 @@ def feature_importance_plot(model, X_data, target_dir):
     indices = np.argsort(importances)[::-1]
 
     # Rearrange feature names so they match the sorted feature importances
-    names = [X_data.columns[i] for i in indices]
+    names = [x_data.columns[i] for i in indices]
 
     # Create plot
     plt.figure(figsize=(20, 5))
@@ -281,21 +277,21 @@ def feature_importance_plot(model, X_data, target_dir):
     plt.ylabel('Importance')
 
     # Add bars
-    plt.bar(range(X_data.shape[1]), importances[indices])
+    plt.bar(range(x_data.shape[1]), importances[indices])
 
     # Add feature names as x-axis labels
-    plt.xticks(range(X_data.shape[1]), names, rotation=90)
+    plt.xticks(range(x_data.shape[1]), names, rotation=90)
 
     filename = 'random_forest_feature_importance.jpg'
     plt.savefig(f'{target_dir}/{filename}', bbox_inches='tight')
     logger.info(f'Saved feature importance plot: {filename}')
 
 
-def train_random_forest_classifier(X_train, y_train, param_grid=None):
+def train_random_forest_classifier(x_train, y_train, param_grid=None):
     """
         Initializes and trains a random forest classifier
         input:
-            X_train: X training data
+            x_train: X training data
             y_train: y training data
             param_grid: [optional] optional params for the RFC model
         output:
@@ -313,15 +309,15 @@ def train_random_forest_classifier(X_train, y_train, param_grid=None):
 
     cv_rfc = GridSearchCV(estimator=rfc, param_grid=param_grid, cv=5)
     logger.info('Training RFC. Please wait...')
-    cv_rfc.fit(X_train, y_train)
+    cv_rfc.fit(x_train, y_train)
     return cv_rfc
 
 
-def train_logistic_regression(X_train, y_train, solver='liblinear'):
+def train_logistic_regression(x_train, y_train, solver='liblinear'):
     """
         initializes and trains a logistic regression model
         input:
-            X_train: X training data
+            x_train: X training data
             y_train: y training data
             solver: [optional] the solver to be used in the LR model
         output:
@@ -330,34 +326,33 @@ def train_logistic_regression(X_train, y_train, solver='liblinear'):
     logger.info(f'Initialising Logistic Regression with {solver}.')
     lrc = LogisticRegression(solver=solver)
     logger.info('Training LR. Please wait...')
-    lrc.fit(X_train, y_train)
+    lrc.fit(x_train, y_train)
     return lrc
 
 
-def train_models(X_train, X_test, y_train, y_test):
+def train_models(x_train, y_train):
     '''
         Train, store model results: images + scores, and store models
         input:
-            X_train: X training data
-            X_test: X testing data
+            x_train: X training data
+            x_test: X testing data
             y_train: y training data
             y_test: y testing data
         output:
             None
     '''
-    cv_rfc = train_random_forest_classifier(X_train, y_train)
-    lrc = train_logistic_regression(X_train, y_train)
+    cv_rfc = train_random_forest_classifier(x_train, y_train)
+    lrc = train_logistic_regression(x_train, y_train)
 
     # store models
     try:
         joblib.dump(cv_rfc.best_estimator_, './models/rfc_model.pkl')
         joblib.dump(lrc, './models/logistic_model.pkl')
         logger.info('Models saved successfully.')
-    except Exception as e:
+    except Exception as err:
         logger.error('Error saving models. Exiting.')
         logger.exception('churn_library')
-        raise e
-    return
+        raise err
 
 
 def load_model(model_pth):
@@ -377,31 +372,31 @@ if __name__ == '__main__':
     RESULTS_DIR = IMAGES_DIR + '/results'
 
     # preprocess data
-    df = import_data('data/bank_data.csv')
-    df = encoder_helper(df, CAT_COLUMNS)
-    perform_eda(df, ['Churn', 'Customer_Age'], EDA_DIR)
+    raw_df = import_data('data/bank_data.csv')
+    encoded_df = encoder_helper(raw_df, CAT_COLUMNS)
+    perform_eda(encoded_df, ['Churn', 'Customer_Age'], EDA_DIR)
 
-    X_train, X_test, y_train, y_test = perform_feature_engineering(
-        df, target_feature='Churn')
+    train_data, test_data, train_label, test_label = perform_feature_engineering(
+        encoded_df, target_feature='Churn')
 
     # model training
-    train_models(X_train, X_test, y_train, y_test)
+    train_models(train_data, train_label)
 
     # reload models for prediction and reporting
-    rfc_model = load_model('./models/rfc_model.pkl')
-    lr_model = load_model('./models/logistic_model.pkl')
+    random_forest_model = load_model('./models/rfc_model.pkl')
+    regression_model = load_model('./models/logistic_model.pkl')
 
     # run predictions
-    y_train_preds_lr = lr_model.predict(X_train)
-    y_test_preds_lr = lr_model.predict(X_test)
+    train_label_preds_lr = regression_model.predict(train_data)
+    test_label_preds_lr = regression_model.predict(test_data)
 
-    y_train_preds_rf = rfc_model.predict(X_train)
-    y_test_preds_rf = rfc_model.predict(X_test)
+    train_label_preds_rf = random_forest_model.predict(train_data)
+    test_label_preds_rf = random_forest_model.predict(test_data)
 
     # reporting and plotting results
-    classification_report_image(y_train, y_test, y_train_preds_lr,
-                                y_train_preds_rf, y_test_preds_lr,
-                                y_test_preds_rf, target_dir=RESULTS_DIR)
+    classification_report_image(train_label, test_label, train_label_preds_lr,
+                                train_label_preds_rf, test_label_preds_lr,
+                                test_label_preds_rf, target_dir=RESULTS_DIR)
 
-    feature_importance_plot(rfc_model, X_train, target_dir=RESULTS_DIR)
-    roc_plot(lr_model, rfc_model, X_test, y_test, target_dir=RESULTS_DIR)
+    feature_importance_plot(random_forest_model, test_data, target_dir=RESULTS_DIR)
+    roc_plot(regression_model, random_forest_model, test_data, test_label, target_dir=RESULTS_DIR)
